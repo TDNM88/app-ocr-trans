@@ -2,7 +2,7 @@ import streamlit as st
 from PIL import Image
 import pytesseract
 import requests
-from streamlit_camera_input import camera_input
+from streamlit_media import media_stream
 
 # Hàm TTS
 def text_to_speech(text):
@@ -26,11 +26,10 @@ def text_to_speech(text):
 st.title("Chụp ảnh từ webcam và OCR")
 
 # Chụp ảnh từ webcam
-img_file = camera_input("Chụp ảnh từ webcam")
+video_bytes = media_stream("webcam")
 
-if img_file:
-    # Hiển thị ảnh chụp
-    img = Image.open(img_file)
+if video_bytes:
+    img = Image.open(video_bytes)
     st.image(img, caption="Ảnh chụp từ webcam", use_column_width=True)
 
     # Thực hiện OCR
@@ -42,7 +41,6 @@ if img_file:
     if st.button("Phát âm thanh"):
         audio_content = text_to_speech(extracted_text)
         if audio_content:
-            # Lưu và phát tệp âm thanh
             with open("output.mp3", "wb") as f:
                 f.write(audio_content)
             st.audio("output.mp3", format="audio/mp3")
