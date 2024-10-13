@@ -2,11 +2,21 @@ import streamlit as st
 from PIL import Image
 import pytesseract
 import requests
-import json
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import av
+
+# Tạo một lớp để xử lý video
+class VideoTransformer(VideoTransformerBase):
+    def __init__(self):
+        self.image = None
+
+    def transform(self, frame):
+        img = frame.to_image()
+        self.image = img
+        return av.VideoFrame.from_image(img)
 
 # Hàm TTS
 def text_to_speech(text):
-    # Gửi yêu cầu tới Edge TTS API
     api_url = "https://api.edge-tts.com/v1/tts"
     payload = {
         "text": text,
@@ -23,27 +33,35 @@ def text_to_speech(text):
         st.error("Error with TTS API: " + response.text)
         return None
 
-# Giao diện người dùng Streamlit
-st.title("OCR và Text-to-Speech")
+# Giao diện người dùng
+st.title("Chụp ảnh từ webcam và OCR")
 
-# Tải lên hình ảnh
-uploaded_file = st.file_uploader("Tải lên hình ảnh", type=["png", "jpg", "jpeg"])
+# Tạo một đối tượng video từ webcam
+ctx = webrtc_streamer(key="example", video_transformer_factory=VideoTransformer)
+transformer = ctx.video_transformer
 
-if uploaded_file is not None:
-    # Hiển thị hình ảnh
-    image = Image.open(uploaded_file)
-    st.image(image, caption='Hình ảnh đã tải lên', use_column_width=True)
+# Thực hiện OCR khi nhấn nút
+if transformer and st.button("Chụp và xử lý ảnh"):
+    if transformer.image is not None:
+        # Hiển thị ảnh chụp
+        st.image(transformer.image, caption='Ảnh chụp từ webcam', use_column_width=True)
 
-    # Thực hiện OCR
-    extracted_text = pytesseract.image_to_string(image)
-    st.write("Văn bản được trích xuất từ hình ảnh:")
-    st.write(extracted_text)
+        # Lưu ảnh tạm thời để xử lý OCR
+        transformer.image.save("temp_image.png")
 
-    # TTS
-    if st.button("Phát âm thanh"):
-        audio_content = text_to_speech(extracted_text)
-        if audio_content:
-            # Lưu tệp âm thanh và phát
-            with open("output.mp3", "wb") as f:
-                f.write(audio_content)
-            st.audio("output.mp3", format='audio/mp3')
+        # Thực hiện OCR
+        extracted_text = pytesseract.image_to_string(transformer.image)
+        st.write("Văn bản được trích xuất từ ảnh:")
+        st.write(extracted_text)
+
+        # TTS - Phát văn bản trích xuất
+        if st.button("Phát âm thanh"):
+            audio_content = text_to_speech(extracted_text)
+            if audio_content:
+                # Lưu và phát tệp âm thanh
+                with open("output.mp3", "wb") as f:
+                    f.write(audio_content)
+                st.audio("output.mp3", format='audio/mp3')
+    else:
+        st.warning("Không có hình ảnh nào được chụp.")
+
